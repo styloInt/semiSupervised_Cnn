@@ -1,0 +1,31 @@
+%UNTITLED Summary of this function goes here
+%   Detailed explanation goes here
+path_caffe = '/home/atemmar/caffe';
+if exist(strcat(path_caffe, '/matlab/+caffe'), 'dir')
+  addpath(path_caffe);
+else
+  error('Please give the right path to caffe');
+end
+
+use_gpu = true;
+% Set caffe mode
+if exist('use_gpu', 'var') && use_gpu
+  caffe.set_mode_gpu();
+  gpu_id = 0;  % we will use the first gpu in this demo
+  caffe.set_device(gpu_id);
+else
+  caffe.set_mode_cpu();
+end
+
+
+%load solver
+solver_name = strcat(path_caffe, '/models/U-net/solver_unet_softmax.prototxt');
+solver = caffe.Solver(solver_name);
+
+% rempla
+
+nbEpochs = 1000;
+solver.step(nbEpochs);
+
+
+
