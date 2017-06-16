@@ -212,7 +212,7 @@ def compute_dice_dataset(dataset, gts, net_deploy):
     return dices
 
 
-def get_heat_map(img, net_deploy)
+def get_heat_map(img, net_deploy):
     net_deploy.blobs['data'].data[...] = img
     net_deploy.forward()
     out = net_deploy.blobs["score-final"].data[0,:,:,:].transpose(1,2,0)
@@ -220,18 +220,25 @@ def get_heat_map(img, net_deploy)
 
 def load_dataset(file_names, rep_dataset):
     size_image = (96,304)
+
+    file_names_file = open(file_names, "r")
+    lines = file_names_file.readlines()
+    files_x = [rep_dataset + line.split('\t')[0] for line in lines]
+    files_y = [rep_dataset + line.split('\t')[1][:-1] for line in lines]
+    file_names_file.close()
+
     images = np.zeros((size_image[0], size_image[1], len(files_x)))
     labels = np.zeros((size_image[0], size_image[1], len(files_x)))
-    images_labels_filenames = open(unlabelled_files_name, "r").readlines()
 
-    files_x = [rep_dataset + line.split('\t')[0] for line in images_labels_filenames]
-    files_y = [rep_dataset + line.split('\t')[1] for line in images_labels_filenames]
-    for file_x, file_y in zip(file_x, files_y):
-        im = Im.open(im = np.array(Image.open(file_x)))
+    nb_image = 0
+    for file_x, file_y in zip(files_x, files_y):
+        im = np.array(Image.open(file_x))
         images[:,:,nb_image] = preprocessing_im(im)
 
         label = np.array(Image.open(file_y))
         labels[:,:,nb_image] = preprocessing_label(label)
+        nb_image += 1
+
 
     return images, labels
 
@@ -287,3 +294,10 @@ def save_results(dataset,labels, net_deploy, rep_save_results = None, nbImageToS
         save_image(np.append(heat_map_normalize, np.zeros((heat_map_normalize.shape[0], heat_map_normalize.shape[1],1)), 2), vmin=0, vmax=1, title="Heat map", save_image=name_save_image[2])
         # plt.subplot(1,nbImageToDisplay,index_plot); index_plot += 1
         save_image(label_out, vmin=0, vmax=1, title="Segmentation predicted", save_image=name_save_image[3])
+
+
+def createDirectoryPath(file_name):
+    path = os.path.dirname(file_name)
+    if not os.path.exists(path):
+        os.makedirs(path)
+
