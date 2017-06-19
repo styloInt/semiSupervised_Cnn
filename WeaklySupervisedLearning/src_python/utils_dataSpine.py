@@ -152,8 +152,8 @@ def dice_metric(seg, gt):
     if(np.count_nonzero(seg[gt!=0]) == 0 and np.count_nonzero(gt) == 0):
         return 1
 
-    dice = np.count_nonzero(seg[gt!=0])*2.0 / float(np.count_nonzero(seg[seg!=0]) + np.count_nonzero(gt[gt!= 0]))
-    print dice
+    dice = np.sum(seg[gt==1])*2.0 / (np.sum(seg) + np.sum(gt))
+    # print dice
     return dice
 
 def preprocessing_im(im):
@@ -192,6 +192,7 @@ def compute_recall(label, label_predicted):
     
     return float(nb_pos_predict/nb_pos)
 
+
 def compute_dice_dataset(dataset, gts, net_deploy):
     dices = []
     for num_image in range(dataset.shape[2]):
@@ -211,6 +212,14 @@ def compute_dice_dataset(dataset, gts, net_deploy):
 
     return dices
 
+def compute_dice_dataset(gts, prediction):
+    dices = []
+    for num_image in range(gts.shape[2]):
+        dices.append(dice_metric(gts[:,:,num_image], prediction[:,:,num_image]))
+
+    return dices
+
+
 
 def get_heat_map(img, net_deploy):
     net_deploy.blobs['data'].data[...] = img
@@ -218,7 +227,7 @@ def get_heat_map(img, net_deploy):
     out = net_deploy.blobs["score-final"].data[0,:,:,:].transpose(1,2,0)
     return normalize_heatmap(out)
 
-def load_dataset(file_names, rep_dataset):
+def load_dataset(file_names, rep_dataset, readInputs=True, readGT=True):
     size_image = (96,304)
 
     file_names_file = open(file_names, "r")
@@ -232,15 +241,25 @@ def load_dataset(file_names, rep_dataset):
 
     nb_image = 0
     for file_x, file_y in zip(files_x, files_y):
-        im = np.array(Image.open(file_x))
-        images[:,:,nb_image] = preprocessing_im(im)
+        if readInputs:
+            im = np.array(Image.open(file_x))
+            images[:,:,nb_image] = preprocessing_im(im)
 
-        label = np.array(Image.open(file_y))
-        labels[:,:,nb_image] = preprocessing_label(label)
+        if readGT:
+            label = np.array(Image.open(file_y))
+            labels[:,:,nb_image] = preprocessing_label(label)
+
         nb_image += 1
 
 
-    return images, labels
+    if readInputs and readGT:
+        return images, labels
+    elif readInputs:
+        return images
+    elif readGT:
+        return labels
+    elif readInputs:
+        return images
 
 
 
