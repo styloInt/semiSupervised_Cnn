@@ -1,4 +1,5 @@
 path_caffe = '/home/atemmar/caffe/';
+path_caffe = "/home/luffy/Documents/Stage/"
 
 import sys
 from utils_dataSpine import *
@@ -12,18 +13,26 @@ caffe.set_device(0)
 caffe.set_mode_gpu()
 
 
-rep_dataset = "/home/atemmar/Documents/Data/FromFirasPng/"
-orginal_net = "/home/atemmar/Documents/Data/FromFirasPng/models/U-net/unet.prototxt"
-solver_name = "/home/atemmar/Documents/Data/FromFirasPng/models/U-net/solver_unet_softmax_iter.prototxt"
+# rep_dataset = "/home/atemmar/Documents/Data/FromFirasPng/"
+rep_dataset = "/home/luffy/Documents/Stage/semiSupervised_Cnn/FromFirasPng/"
+
+orginal_net = rep_dataset + "/models/U-net/unet.prototxt"
+solver_name = rep_dataset + "/models/U-net/solver_unet_softmax_iter.prototxt"
 k = 4000
+lamda = 1.
 original_train_filenames = rep_dataset + "train.txt"
 unlabelled_files_name = rep_dataset + "unlab.txt"
 test_files_name = rep_dataset + "test.txt"
 number_epoch = 20
 repSavePrediction = rep_dataset
 nameTmpTrainFiles = rep_dataset + "/train_tmp.txt"
-weight_file = "/home/atemmar/Documents/Data/FromFirasPng/models_pretrained/U-net/train_unet_spine_softmax_iter_460000.caffemodel"
-net_deploy_name = "/home/atemmar/Documents/Data/FromFirasPng/models/U-net/unet_deploy.prototxt"
+weight_file = rep_dataset + "/models_pretrained/U-net/train_unet_spine_softmax_iter_460000.caffemodel"
+net_deploy_name = rep_dataset + "/models/U-net/unet_deploy.prototxt"
+dice_saveUnlab_filename = rep_dataset + "/dicesResuls_unlab.txt"
+
+epoch_start = 13
+
+	
 
 def replace_labelFiles(prototxt, old_labelName, newLabelFileName):
 
@@ -78,10 +87,11 @@ for line in unlabelled_files_name_file.readlines():
 unlabelled_files_name_file.close()
 
 
-# solver_file = None
-# if len(sys.argv) > 3:
-# 	solver_state = sys.argv[3]
-# 	solver.restore(solver_state)
+if epoch_start != 0:
+	weight_file = rep_dataset + "/models_pretrained/U-net_iter/train_unet_spine_softmax_iter_iter_" + str((epoch_start) * k) + ".solverstate"
+
+dice_saveUnlab_file = open(dice_saveUnlab_filename, "w")
+
 
 # Copy the original file in a tmp file
 copyfile(original_train_filenames, nameTmpTrainFiles)
@@ -92,13 +102,17 @@ copyfile(orginal_net, network_prototxt)
 replace_labelFiles (network_prototxt, original_train_filenames, nameTmpTrainFiles)
 
 solver = caffe.SGDSolver(solver_name)
-solver.net.copy_from(weight_file)
+if "solverstate" in weight_file:
+	solver.restore(weight_file)
+else:
+	solver.net.copy_from(weight_file)
 
 print ("end of initialisation")
 
+
 # #################### TRAINING ########################### # 
 print ("training...")
-for num_epoch in range(number_epoch):
+for num_epoch in range(epoch_start, number_epoch):
 	# caffe.set_mode_gpu()
 
 	# Run the algorithm for k itterations, give a weight lamdda for the unlabelled data
@@ -107,38 +121,40 @@ for num_epoch in range(number_epoch):
 	# #################### PREDICTION ON UNLABALLED  data ########################### # 
 	# Use graph cut or trust region to improve the segmentation. save the results
 	print ("Prediction ...")
-	# caffe.set_mode_cpu()
-	# caffe.set_mode_gpu()
-	new_weight_file = "/home/atemmar/Documents/Data/FromFirasPng/models_pretrained/U-net_iter/train_unet_spine_softmax_iter_iter_" + str((num_epoch+1) * k) + ".caffemodel"
+	new_weight_file = rep_dataset + "/models_pretrained/U-net_iter/train_unet_spine_softmax_iter_iter_" + str((num_epoch+1) * k) + ".caffemodel"
 	net_deploy = caffe.Net(net_deploy_name,      # defines the structure of the model
 	                new_weight_file, caffe.TEST)
 
 	copyfile(original_train_filenames, nameTmpTrainFiles)
 	train_tmp_file = open(nameTmpTrainFiles, "a")
+	predictions = np.zeros(labels_unlab.shape)
 	for num_image in range(images_unlab.shape[2]):
 		img = images_unlab[:,:, num_image]
 		heatmap = get_heat_map(img, net_deploy)
-		prediction = heatmap.argmax(2)
-
+		predictions[:,:,num_image] = heatmap.argmax(2)
 
 		nameFile = "/prediction_tmp/epoch_" + str(num_epoch) + "/" + "/".join(unlabelled_original_output[num_image].split("/")[-2:])
-		createDirectoryPath(repSavePrediction + nameFile)
-		scipy.misc.toimage(prediction, cmin=0, cmax=255).save(repSavePrediction + nameFile)
+		nameFileWeight = "/prediction_tmp/epoch_" + str(num_epoch) + "/" + "/".join((unlabelled_original_output[num_image][:-4] + "_weight.png").split("/")[-2:])
 
-		train_tmp_file.write(unlabelled_inputs[num_image] + "\t" + nameFile +"\n")
+		createDirectoryPath(repSavePrediction + nameFile)
+		scipy.misc.toimage(predictions[:,:,num_image], cmin=0, cmax=255).save(repSavePrediction + nameFile)
+
+		weight = np.ones((img.shape)) * lamda
+		scipy.misc.toimage(weight, cmin=0, cmax=1).save(repSavePrediction + nameFileWeight)
+
+		train_tmp_file.write(unlabelled_inputs[num_image] + "\t" + nameFile + "\t" + nameFileWeight +"\n")
 
 	print ("End of prediction ")
 	net_deploy = None
-
 	train_tmp_file.close()
 
+	print("Compute dice on the unlabel files .... ")
+	dice = np.mean(compute_dice_dataset(labels_unlab, predictions))
+	print ("Dice : ", dice)
+	dice_saveUnlab_file.write(str(num_epoch) + " : " + str(dice))
 
 	solver = caffe.SGDSolver(solver_name)
 	solver.restore(new_weight_file.replace("caffemodel", 'solverstate'))
 
 print ("end of training")
-
-	# TODO :Compute the dice results for image gt, unlabelled image and test set. save the results, add to the list of files
-
-# loop
 

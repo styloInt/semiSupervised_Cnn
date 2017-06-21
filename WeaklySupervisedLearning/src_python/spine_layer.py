@@ -53,6 +53,12 @@ def hist_match(source, template):
 
     return interp_t_values[bin_idx].reshape(oldshape)
 
+def im2double(im):
+    min_val = np.min(im.ravel())
+    max_val = np.max(im.ravel())
+    out = (im.astype('float') - min_val) / (max_val - min_val)
+    return out
+
 class Spine_layer(caffe.Layer):
     """
     Load (input image, label image) pairs from PASCAL-Context
@@ -105,6 +111,7 @@ class Spine_layer(caffe.Layer):
         self.indices_x = [line.split('\t')[0] for line in indices]
         self.indices_y = [line.split('\t')[1] for line in indices]
 
+
         new_shape = (96,304)
 
         self.idx = 0
@@ -121,6 +128,15 @@ class Spine_layer(caffe.Layer):
                 self.inputs[:,:,self.nb_images] = data
                 self.labels[:,:,self.nb_images] = label
                 self.nb_images += 1
+
+        self.weights = np.zeros((new_shape[0], new_shape[1], len(self.indices_x)))
+        default_weight = np.ones(new_shape)
+        for i, line in enumerate(indices): 
+            split_line = line.split('\t')
+            if len(split_line) > 2: #weight are defined
+                self.weights[:,:,i] = im2double(np.array(Image.open('{}/{}'.format(self.dir, split_line[2]))))
+            else:
+                self.weights[:,:,i] = default_weight
 
         # make eval deterministic
         # if 'train' not in self.split:
@@ -154,6 +170,7 @@ class Spine_layer(caffe.Layer):
 
         self.data = self.inputs[:,:,self.idx]
         self.label = self.labels[:,:, self.idx]
+        self.weight = self.weights[:,:, self.idx]
 
         # reshape tops to fit (leading 1 is for batch dimension)
         top[0].reshape(1, 1,*self.data.shape)
@@ -163,6 +180,7 @@ class Spine_layer(caffe.Layer):
         # assign output
         top[0].data[...] = self.data
         top[1].data[...] = self.label
+        top[2].data[...] = self.weight
 
         # pick next input
         if self.random:

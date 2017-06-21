@@ -119,30 +119,30 @@ def save_image(img, vmin=None, vmax=None, title='', save_image=None, save_asMat=
 	# plt.axis('off')
 	# plt.title(title)
 
-	if not save_image is None: #if not nans
-		path = os.path.dirname(save_image)
-		if not os.path.exists(path):
-			os.makedirs(path)
+    if not save_image is None: #if not nans
+        path = os.path.dirname(save_image)
+        if not os.path.exists(path):
+            os.makedirs(path)
 
-        scipy.misc.toimage(img, cmin=vmin, cmax=vmax).save(save_image)
+    scipy.misc.toimage(img, cmin=vmin, cmax=vmax).save(save_image)
 
-        if save_asMat:
-            scipy.io.savemat(save_image[:-4] + ".mat", mdict={os.path.basename(save_image)[:-4] : img})
+    if save_asMat:
+        scipy.io.savemat(save_image[:-4] + ".mat", mdict={os.path.basename(save_image)[:-4] : img})
 
-		# figure = plt.figure(figsize=(img.shape[0], img.shape[1]), dpi=1)
-		# axis = plt.subplot(1, 1, 1)
-		# plt.axis('off')
-		# plt.tick_params(axis='both', left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
+    # figure = plt.figure(figsize=(img.shape[0], img.shape[1]), dpi=1)
+    # axis = plt.subplot(1, 1, 1)
+    # plt.axis('off')
+    # plt.tick_params(axis='both', left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
 
-		# plt.imshow(img, vmin=vmin, vmax=vmax)
+    # plt.imshow(img, vmin=vmin, vmax=vmax)
 
 
-		# extent = axis.get_window_extent().transformed(figure.dpi_scale_trans.inverted())
-		# plt.savefig(save_image, format='jpeg', bbox_inches=extent, pad_inches=0)
-		# plt.close(figure)
-		
-		# image = Image.fromarray(img * 255/(255-np.))
-		# image.save(save_image)
+    # extent = axis.get_window_extent().transformed(figure.dpi_scale_trans.inverted())
+    # plt.savefig(save_image, format='jpeg', bbox_inches=extent, pad_inches=0)
+    # plt.close(figure)
+
+    # image = Image.fromarray(img * 255/(255-np.))
+    # image.save(save_image)
 
 
 def dice_metric(seg, gt):
@@ -151,6 +151,7 @@ def dice_metric(seg, gt):
 
     if(np.count_nonzero(seg[gt!=0]) == 0 and np.count_nonzero(gt) == 0):
         return 1
+
 
     dice = np.sum(seg[gt==1])*2.0 / (np.sum(seg) + np.sum(gt))
     # print dice
@@ -215,17 +216,29 @@ def compute_dice_dataset(dataset, gts, net_deploy):
 def compute_dice_dataset(gts, prediction):
     dices = []
     for num_image in range(gts.shape[2]):
-        dices.append(dice_metric(gts[:,:,num_image], prediction[:,:,num_image]))
+        dices.append(dice_metric(gt=gts[:,:,num_image], seg=prediction[:,:,num_image]))
 
     return dices
 
 
-
 def get_heat_map(img, net_deploy):
+    img = preprocessing_im(img)
     net_deploy.blobs['data'].data[...] = img
     net_deploy.forward()
     out = net_deploy.blobs["score-final"].data[0,:,:,:].transpose(1,2,0)
     return normalize_heatmap(out)
+
+def get_prediction(img, net_deploy):
+    heatmap = get_heat_map(img, net_deploy)
+    return heatmap.argmax(axis=2)
+
+def get_predictions(imgs, net_deploy):
+    predictions = np.zeros((imgs.shape[0], imgs.shape[1], imgs.shape[2]))
+    for num_image in range(imgs.shape[2]):
+        predictions[:,:,num_image] = get_prediction(imgs[:,:,num_image], net_deploy)
+
+    return predictions
+
 
 def load_dataset(file_names, rep_dataset, readInputs=True, readGT=True):
     size_image = (96,304)
