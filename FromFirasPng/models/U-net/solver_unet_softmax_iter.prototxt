@@ -13,7 +13,7 @@ momentum: 0.99
 weight_decay: 0.0005
 stepsize: 9000
 snapshot: 2000
-snapshot_prefix: "/home/atemmar/Documents/Data/FromFirasPng/models_pretrained/U-net_iter/train_unet_spine_softmax_iter"
+snapshot_prefix                         : "/home/atemmar/Documents/Data/FromFirasPng//models_pretrained/U-net_iter/train_unet_spine_softmax_8000_0.7_iter"
 solver_mode: GPU
 test_initialization: true
 average_loss: 20

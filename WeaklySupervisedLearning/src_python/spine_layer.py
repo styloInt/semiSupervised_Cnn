@@ -54,10 +54,8 @@ def hist_match(source, template):
     return interp_t_values[bin_idx].reshape(oldshape)
 
 def im2double(im):
-    min_val = np.min(im.ravel())
-    max_val = np.max(im.ravel())
-    out = (im.astype('float') - min_val) / (max_val - min_val)
-    return out
+    im = im.astype(float) / 255.
+    return im
 
 class Spine_layer(caffe.Layer):
     """
@@ -99,7 +97,7 @@ class Spine_layer(caffe.Layer):
         self.seed = params.get('seed', None)
 
         # two tops: data and label
-        if len(top) != 2:
+        if len(top) < 2:
             raise Exception("Need to define two tops: data and label.")
         # data layers have no bottoms
         if len(bottom) != 0:
@@ -120,14 +118,16 @@ class Spine_layer(caffe.Layer):
 
         self.nb_images = 0
         for i in range(len(self.indices_x)):
+            # if (len(np.unique(label)) == 2) :
+
             label = self.load_label(self.indices_y[i])
-            if (len(np.unique(label)) == 2) :
-                data = self.load_image(self.indices_x[i])
-                # self.inputs[:,:,self.nb_images] = cv2.resize(data, (new_shape[1], new_shape[0]))
-                # self.labels[:,:,self.nb_images] = cv2.resize(label, (new_shape[1], new_shape[0]))
-                self.inputs[:,:,self.nb_images] = data
-                self.labels[:,:,self.nb_images] = label
-                self.nb_images += 1
+            # print "indice y : ", self.indices_y[i]
+            data = self.load_image(self.indices_x[i])
+            # self.inputs[:,:,self.nb_images] = cv2.resize(data, (new_shape[1], new_shape[0]))
+            # self.labels[:,:,self.nb_images] = cv2.resize(label, (new_shape[1], new_shape[0]))
+            self.inputs[:,:,self.nb_images] = data
+            self.labels[:,:,self.nb_images] = label
+            self.nb_images += 1
 
         self.weights = np.zeros((new_shape[0], new_shape[1], len(self.indices_x)))
         default_weight = np.ones(new_shape)
@@ -135,6 +135,7 @@ class Spine_layer(caffe.Layer):
             split_line = line.split('\t')
             if len(split_line) > 2: #weight are defined
                 self.weights[:,:,i] = im2double(np.array(Image.open('{}/{}'.format(self.dir, split_line[2]))))
+                # print "here"
             else:
                 self.weights[:,:,i] = default_weight
 
@@ -145,7 +146,7 @@ class Spine_layer(caffe.Layer):
         # randomization: seed and pick
         if self.random:
             random.seed(self.seed)
-            self.idx = random.randint(0, self.nb_images)
+            self.idx = random.randint(0, self.nb_images-1)
 
 
         if "image_template" in params:
@@ -175,6 +176,7 @@ class Spine_layer(caffe.Layer):
         # reshape tops to fit (leading 1 is for batch dimension)
         top[0].reshape(1, 1,*self.data.shape)
         top[1].reshape(1, 1,*self.label.shape)
+        top[2].reshape(1, 1, *self.weight.shape)
 
     def forward(self, bottom, top):
         # assign output
@@ -184,7 +186,7 @@ class Spine_layer(caffe.Layer):
 
         # pick next input
         if self.random:
-            self.idx = random.randint(0, self.nb_images)
+            self.idx = random.randint(0, self.nb_images-1)
         else:
             self.idx += 1
             if self.idx == len(self.indices):

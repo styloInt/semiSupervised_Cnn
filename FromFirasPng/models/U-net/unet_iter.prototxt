@@ -4,6 +4,7 @@ layer {
   type: "Python"
   top: "data"
   top: "label"
+  top: "weight"
   python_param {
     module: "spine_layer"
     layer: "Spine_layer"
@@ -19,6 +20,7 @@ layer {
   type: "Python"
   top: "data"
   top: "label"
+  top: "weight"
   python_param {
     module: "spine_layer"
     layer: "Spine_layer"
@@ -450,9 +452,10 @@ layer {
 }
 layer {
   name: "loss"
-  type: "SoftmaxWithLoss"
+  type: "SoftmaxWeightedWithLoss"
   bottom: "score-final"
   bottom: "label"
+  bottom: "weight"
   top: "loss"
     loss_param {
       normalize: false
